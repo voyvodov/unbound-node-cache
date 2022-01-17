@@ -1,0 +1,28 @@
+---
+
+roundRobin: true
+rateLimit: 100
+numThreads: 2
+verbosity: 1
+tcpUpstream: true
+cache:
+  maxTTL: 18400
+  minTTL: 300
+  negativeMaxTTL: 10
+  prefetch: true
+  serveExpired: true
+  serveExpiredTTL: 3600
+  serveExpiredClientTimeout: 500
+logging:
+  queries: false
+  replies: false
+  servfail: true
+forwardZones:
+  - name: '.'
+    servers:
+      - 8.8.8.8
+      - 1.1.1.1
+stubZones:
+  - name: example.com
+    servers:
+      - 192.168.0.10

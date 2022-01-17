@@ -1,0 +1,15 @@
+---
+
+roundRobin: true
+rateLimit: 100
+numThreads: 2
+verbosity: 1
+cache:
+  maxTTL: 18400
+  minTTL: 300
+  negativeMaxTTL: 10
+  prefetch: true
+logging:
+  queries: false
+  replies: false
+  servfail: true

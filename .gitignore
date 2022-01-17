@@ -1,0 +1,4 @@
+# Some generic excludes
+.vscode 
+
+build/nodelocaldns

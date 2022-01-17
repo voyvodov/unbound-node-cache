@@ -1,0 +1,374 @@
+#
+# See unbound.conf(5) man page, version 1.13.2.
+#
+# this is a comment.
+
+# Use this anywhere in the file to include other text into this file.
+#include: "otherfile.conf"
+
+# Use this anywhere in the file to include other text, that explicitly starts a
+# clause, into this file. Text after this directive needs to start a clause.
+#include-toplevel: "otherfile.conf"
+
+# The server clause sets the main parameters.
+server:
+  extended-statistics: yes
+
+  # verbosity number, 0 is least verbose. 1 is default.
+  verbosity: {{ .Verbosity }}
+ 
+  # number of threads to create. 1 disables threading.
+  {{ if gt .NumThreads 0 }}
+  num-threads: {{ .NumThreads }}
+  {{ end }}
+
+  # specify the interfaces to answer queries from by ip-address.
+  # The default is to listen to localhost (127.0.0.1 and ::1).
+  # specify 0.0.0.0 and ::0 to bind to all available interfaces.
+  # specify every interface[@port] on a new 'interface:' labelled line.
+  # The listen interfaces are not changed on reload, only on restart.
+  # interface: 192.0.2.153
+  # interface: 192.0.2.154
+  # interface: 192.0.2.154@5003
+  # interface: 2001:DB8::5
+  {{ range .Interfaces -}}
+  interface: {{ . }}
+  {{ end -}}
+
+  # port to answer queries from
+  port: {{ .Port }}
+
+  # Specify a netblock to use remainder 64 bits as random bits for
+  # upstream queries.  Uses freebind option (Linux).
+  # outgoing-interface: 2001:DB8::/64
+  # Also (Linux:) ip -6 addr add 2001:db8::/64 dev lo
+  # And: ip -6 route add local 2001:db8::/64 dev lo
+  # And set prefer-ip6: yes to use the ip6 randomness from a netblock.
+  # Set this to yes to prefer ipv6 upstream servers over ipv4.
+  # prefer-ip6: no
+
+  # Prefer ipv4 upstream servers, even if ipv6 is available.
+  # prefer-ip4: no
+
+        
+
+  # buffer size for UDP port 53 incoming (SO_RCVBUF socket option).
+  # 0 is system default.  Use 4m to catch query spikes for busy servers.
+  so-rcvbuf: 4m
+
+  # buffer size for UDP port 53 outgoing (SO_SNDBUF socket option).
+  # 0 is system default.  Use 4m to handle spikes on very busy servers.
+  so-sndbuf: 4m
+
+  # use SO_REUSEPORT to distribute queries over threads.
+  # at extreme load it could be better to turn it off to distribute even.
+  so-reuseport: {{ if gt .NumThreads 1 }}yes{{ else }}no{{ end }}
+
+  # use IP_TRANSPARENT so the interface: addresses can be non-local
+  # and you can config non-existing IPs that are going to work later on
+  # (uses IP_BINDANY on FreeBSD).
+  # ip-transparent: no
+
+  # use IP_FREEBIND so the interface: addresses can be non-local
+  # and you can bind to nonexisting IPs and interfaces that are down.
+  # Linux only.  On Linux you also have ip-transparent that is similar.
+  # ip-freebind: no
+
+  # If yes, Unbound rotates RRSet order in response (the random num-
+  # ber  is  taken  from the query ID, for speed and thread safety).
+  rrset-roundrobin: {{ toYesNo .RoundRobin }}
+
+  # the time to live (TTL) value lower bound, in seconds. Default 0.
+  # If more than an hour could easily give trouble due to stale data.
+  cache-min-ttl: {{ .Cache.MinTTL }}
+
+  # the time to live (TTL) value cap for RRsets and messages in the
+  # cache. Items are not cached for longer. In seconds.
+  cache-max-ttl: {{ .Cache.MaxTTL }}
+
+  {{ if gt .Cache.NegativeMaxTTL 0 }}
+  # the time to live (TTL) value cap for negative responses in the cache
+  cache-max-negative-ttl: {{ .Cache.NegativeMaxTTL }}
+  {{ end }}
+
+  # more cache memory, rrset=msg*2
+  rrset-cache-size: 100m
+  msg-cache-size: 50m
+
+
+  # more outgoing connections
+  # depends on number of cores: 1024/cores - 50
+  outgoing-range: {{ sub (div 8192 .NumThreads) 50 }}
+  num-queries-per-thread: 4096
+  
+  # Enable IPv4, "yes" or "no".
+	# do-ip4: yes
+
+	# Enable IPv6, "yes" or "no".
+	do-ip6: no
+
+	# Enable UDP, "yes" or "no".
+	# do-udp: yes
+
+	# Enable TCP, "yes" or "no".
+	# do-tcp: yes
+        
+  # upstream connections use TCP only (and no UDP), "yes" or "no"
+  # useful for tunneling scenarios, default no.
+  tcp-upstream: {{ if .TCPUpstream }}yes{{ else }}no{{ end }}
+
+        
+  # control which clients are allowed to make (recursive) queries
+  # to this server. Specify classless netblocks with /size and action.
+  # By default everything is refused, except for localhost.
+  # Choose deny (drop message), refuse (polite error reply),
+  # allow (recursive ok), allow_setrd (recursive ok, rd bit is forced on),
+  # allow_snoop (recursive and nonrecursive ok)
+  # deny_non_local (drop queries unless can be answered from local-data)
+  # refuse_non_local (like deny_non_local but polite error reply).
+  # access-control: 0.0.0.0/0 refuse
+  # access-control: 127.0.0.0/8 allow
+  # access-control: ::0/0 refuse
+  # access-control: ::1 allow
+  # access-control: ::ffff:127.0.0.1 allow
+  access-control: 0.0.0.0/0 allow
+
+  # if given, a chroot(2) is done to the given directory.
+  # i.e. you can chroot to the working directory, for example,
+  # for extra security, but make sure all files are in that directory.
+  #
+  # If chroot is enabled, you should pass the configfile (from the
+  # commandline) as a full path from the original root. After the
+  # chroot has been performed the now defunct portion of the config
+  # file path is removed to be able to reread the config after a reload.
+  #
+  # All other file paths (working dir, logfile, roothints, and
+  # key files) can be specified in several ways:
+  #       o as an absolute path relative to the new root.
+  #       o as a relative path to the working directory.
+  #       o as an absolute path relative to the original root.
+  # In the last case the path is adjusted to remove the unused portion.
+  #
+  # The pid file can be absolute and outside of the chroot, it is
+  # written just prior to performing the chroot and dropping permissions.
+  #
+  # Additionally, unbound may need to access /dev/urandom (for entropy).
+  # How to do this is specific to your OS.
+  #
+  # If you give "" no chroot is performed. The path must not end in a /.
+  chroot: ""
+
+  # if given, user privileges are dropped (after binding port),
+  # and the given username is assumed. Default is user "unbound".
+  # If you give "" no privileges are dropped.
+  # username: "unbound"
+  username: ""
+
+  # the working directory. The relative files in this config are
+  # relative to this directory. If you give "" the working directory
+  # is not changed.
+  # If you give a server: directory: dir before include: file statements
+  # then those includes can be relative to the working directory.
+  # directory: "/etc/unbound"
+
+        
+  # Log to syslog(3) if yes. The log facility LOG_DAEMON is used to
+  # log to. If yes, it overrides the logfile.
+  use-syslog: no
+
+  # Log identity to report. if empty, defaults to the name of argv[0]
+  # (usually "unbound").
+  # log-identity: ""
+
+  # print UTC timestamp in ascii to logfile, default is epoch in seconds.
+  # log-time-ascii: no
+
+  # print one line with time, IP, name, type, class for every query.
+  log-queries: {{ toYesNo .Logging.Queries }}
+
+  # print one line per reply, with time, IP, name, type, class, rcode,
+  # timetoresolve, fromcache and responsesize.
+  log-replies: {{ toYesNo .Logging.Replies }}
+
+  # log with tag 'query' and 'reply' instead of 'info' for
+  # filtering log-queries and log-replies from the log.
+  # log-tag-queryreply: no
+
+  # log the local-zone actions, like local-zone type inform is enabled
+  # also for the other local zone types.
+  # log-local-actions: no
+
+  # print log lines that say why queries return SERVFAIL to clients.
+  log-servfail: {{ toYesNo .Logging.Servfail }}
+
+  # the pid file. Can be an absolute path outside of chroot/work dir.
+  pidfile: "{{ .Pid }}"
+
+        
+  # Aggressive NSEC uses the DNSSEC NSEC chain to synthesize NXDOMAIN
+  # and other denials, using information from previous NXDOMAINs answers.
+  # aggressive-nsec: no
+
+        
+  # if yes, perform prefetching of almost expired message cache entries.
+  prefetch: {{ toYesNo .Cache.Prefetch }}
+
+  # if yes, perform key lookups adjacent to normal lookups.
+  # prefetch-key: no
+
+  # the amount of memory to use for the key cache.
+  # plain value in bytes or you can append k, m or G. default is "4Mb".
+  # key-cache-size: 4m
+
+  # the number of slabs to use for the key cache.
+  # the number of slabs must be a power of 2.
+  # more slabs reduce lock contention, but fragment memory usage.
+  # key-cache-slabs: 4
+
+  # the amount of memory to use for the negative cache.
+  # plain value in bytes or you can append k, m or G. default is "1Mb".
+  # neg-cache-size: 1m
+
+  # If enabled, unbound attempts to serve old responses  from  cache
+  # with  a  TTL  of serve-expired-reply-ttl in the response without
+  # waiting for the actual resolution to finish.  The actual resolu-
+  # tion answer ends up in the cache later on.  Default is "no".
+  serve-expired: {{ toYesNo .Cache.ServeExpired }}
+
+  # Limit  serving  of expired responses to configured seconds after
+  # expiration. 0 disables the limit.  This option only applies when
+  # serve-expired is enabled.  A suggested value per RFC 8767 is be-
+  # tween 86400 (1 day) and 259200 (3 days).  The default is 0.
+  serve-expired-ttl: {{ .Cache.ServeExpiredTTL }}
+
+  # Time  in milliseconds before replying to the client with expired
+  # data.  This essentially  enables  the  serve-stale  behavior  as
+  # specified in RFC 8767 that first tries to resolve before immedi-
+  # ately responding with expired data.  A recommended value per RFC
+  # 8767  is  1800.   Setting  this to 0 will disable this behavior.
+  # Default is 0.
+  serve-expired-client-timeout: {{ .Cache.ServeExpiredClientTimeout }}
+
+  # ratelimit for uncached, new queries, this limits recursion effort.
+  # ratelimiting is experimental, and may help against randomqueryflood.
+  # if 0(default) it is disabled, otherwise state qps allowed per zone.
+  ratelimit: {{ .RateLimit }}
+
+  # ratelimits are tracked in a cache, size in bytes of cache (or k,m).
+  # ratelimit-size: 4m
+  # ratelimit cache slabs, reduces lock contention if equal to cpucount.
+  # ratelimit-slabs: 4
+
+  # 0 blocks when ratelimited, otherwise let 1/xth traffic through
+  # ratelimit-factor: 10
+
+  # override the ratelimit for a specific domain name.
+  # give this setting multiple times to have multiple overrides.
+  # ratelimit-for-domain: example.com 1000
+  # override the ratelimits for all domains below a domain name
+  # can give this multiple times, the name closest to the zone is used.
+  # ratelimit-below-domain: com 1000
+
+  # global query ratelimit for all ip addresses.
+  # feature is experimental.
+  # if 0(default) it is disabled, otherwise states qps allowed per ip address
+  # ip-ratelimit: 0
+
+  # ip ratelimits are tracked in a cache, size in bytes of cache (or k,m).
+  # ip-ratelimit-size: 4m
+  # ip ratelimit cache slabs, reduces lock contention if equal to cpucount.
+  # ip-ratelimit-slabs: 4
+
+  # 0 blocks when ip is ratelimited, otherwise let 1/xth traffic through
+  # ip-ratelimit-factor: 10
+
+  # Limit the number of connections simultaneous from a netblock
+  # tcp-connection-limit: 192.0.2.0/24 12
+
+  # Disable DNSSEC validation
+  module-config: "iterator"
+
+  {{ range .StubZones -}}
+  domain-insecure: {{ .Name }}
+  {{ end -}}
+  {{ range .ForwardZones -}}
+  {{ if ne .Name "." -}}
+  domain-insecure: {{ .Name }}
+  {{ end -}}
+  {{ end -}}
+       
+
+python:
+dynlib:
+remote-control:
+  # Enable remote control with unbound-control(8) here.
+  # set up the keys and certificates with unbound-control-setup.
+  control-enable: yes
+
+  # what interfaces are listened to for remote control.
+  # give 0.0.0.0 and ::0 to listen to all interfaces.
+  # set to an absolute path to use a unix local name pipe, certificates
+  # are not used for that, so key and cert files need not be present.
+  # control-interface: 127.0.0.1
+  # control-interface: ::1
+  control-interface: /var/run/unbound-control.sock
+
+  # port number for remote control operations.
+  # control-port: 8953
+
+  # for localhost, you can disable use of TLS by setting this to "no"
+  # For local sockets this option is ignored, and TLS is not used.
+  # control-use-cert: "no"
+
+# Stub zones.
+# Create entries like below, to make all queries for 'example.com' and
+# 'example.org' go to the given list of nameservers. list zero or more
+# nameservers by hostname or by ipaddress. If you set stub-prime to yes,
+# the list is treated as priming hints (default is no).
+# With stub-first yes, it attempts without the stub if it fails.
+# Consider adding domain-insecure: name and local-zone: name nodefault
+# to the server: section if the stub is a locally served zone.
+# stub-zone:
+#       name: "example.com"
+#       stub-addr: 192.0.2.68
+#       stub-prime: no
+#       stub-first: no
+#       stub-tls-upstream: no
+#       stub-no-cache: no
+# stub-zone:
+#       name: "example.org"
+#       stub-host: ns.example.com.
+
+{{ range .StubZones }}
+stub-zone:
+  name: "{{ .Name }}"
+  {{ range .Servers -}}
+  stub-addr: {{ . }}
+  {{ end -}}
+  stub-no-cache: no
+{{ end }}
+
+# Forward zones
+# Create entries like below, to make all queries for 'example.com' and
+# 'example.org' go to the given list of servers. These servers have to handle
+# recursion to other nameservers. List zero or more nameservers by hostname
+# or by ipaddress. Use an entry with name "." to forward all queries.
+# If you enable forward-first, it attempts without the forward if it fails.
+# forward-zone:
+#       name: "example.com"
+#       forward-addr: 192.0.2.68
+#       forward-addr: 192.0.2.73@5355  # forward to port 5355.
+#       forward-first: no
+#       forward-tls-upstream: no
+#       forward-no-cache: no
+# forward-zone:
+#       name: "example.org"
+#       forward-host: fwd.example.com
+
+{{ range .ForwardZones }}
+forward-zone:
+  name: "{{ .Name }}"
+  {{ range .Servers -}}
+  forward-addr: {{ . }}
+  {{ end -}}
+{{ end }}
