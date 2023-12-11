@@ -44,10 +44,10 @@ RUN set -e -x && \
 FROM debian:bullseye as unbound
 
 
-ARG UNBOUND_VERSION=1.14.0
-ARG UNBOUND_SHA256=6ef91cbf02d5299eab39328c0857393de7b4885a2fe7233ddfe3c124ff5a89c8
+ARG UNBOUND_VERSION=1.19.0
+ARG UNBOUND_SHA256=a97532468854c61c2de48ca4170de854fd3bc95c8043bb0cfb0fe26605966624
 
-ENV UNBOUND_DOWNLOAD_URL=https://nlnetlabs.nl/downloads/unbound/unbound-1.14.0.tar.gz \
+ENV UNBOUND_DOWNLOAD_URL=https://nlnetlabs.nl/downloads/unbound/unbound-${UNBOUND_VERSION}.tar.gz \
     NAME=unbound
 
 WORKDIR /tmp/src
@@ -94,7 +94,7 @@ RUN build_deps="curl gcc libc-dev libevent-dev libexpat1-dev libnghttp2-dev make
         /var/tmp/* \
         /var/lib/apt/lists/*
 
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
 WORKDIR /tmp/src
 
